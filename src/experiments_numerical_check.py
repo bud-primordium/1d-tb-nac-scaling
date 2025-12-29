@@ -30,7 +30,7 @@ def _select_state_by_overlap(
     evals: np.ndarray,
     evecs: np.ndarray,
     psi_ref: np.ndarray,
-    energy_tol: float = 1e-8,
+    energy_tol: float = 1e-6,
 ) -> np.ndarray:
     """在退化子空间内重构与参考态最匹配的本征态。"""
     overlaps = evecs.conj().T @ psi_ref
