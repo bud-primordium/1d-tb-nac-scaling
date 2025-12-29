@@ -1,0 +1,448 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[UTF8]{ctex}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+\geometry{left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+
+% 定义常用命令
+\newcommand{\bra}[1]{\langle #1 |}
+\newcommand{\ket}[1]{| #1 \rangle}
+\newcommand{\braket}[2]{\langle #1 | #2 \rangle}
+\newcommand{\mean}[1]{\langle #1 \rangle}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\ii}{\mathrm{i}}
+
+\title{\textbf{一维紧束缚模型中非绝热耦合的尺寸效应} \\ \large 标度律的数值验证}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    非绝热耦合（NAC）的尺寸依赖性直接影响非绝热分子动力学模拟的计算成本与物理解释。本报告基于一维紧束缚模型，通过解析推导与数值计算相结合的方法，验证三类电子态配对的 NAC 标度律：延展-延展态配对满足 $\mean{|d_{ij}|^2} \propto N^{-1}$，局域-局域态配对满足 $\mean{|d_{ij}|^2} \propto N^0$（与尺寸无关），局域-延展态配对满足 $\mean{|d_{ij}|^2} \propto N^{-1}$。数值结果表明，单带模型与 SSH 双带模型均精确符合理论预期，拟合指数 $\beta$ 与理论值偏差小于 $0.01$。解析方法与有限差分数值方法的相对误差小于 $10^{-8}$，确认了理论框架的正确性。
+\end{abstract}
+
+\section{引言}
+
+非绝热耦合（Non-Adiabatic Coupling, NAC）描述电子态之间由核运动诱导的跃迁，是非绝热分子动力学模拟的核心物理量。在周期性体系中，NAC 的大小与系统尺寸 $N$（或体积 $V$）之间存在特定的标度关系，这一关系对理解大尺寸体系中的非绝热效应至关重要。
+
+理论分析表明，NAC 的尺寸依赖性可分解为三个因子的乘积：电子态归一化因子、电声耦合矩阵元、以及有效积分区域。根据电子态的空间分布特性（延展态或局域态），可归纳为三类标度律：
+
+\begin{enumerate}
+    \item \textbf{延展态-延展态}（Case 1）：两个 Bloch 态之间的跃迁，受动量守恒约束，仅特定波矢 $q$ 的声子模式贡献，$|d_{ij}| \propto 1/\sqrt{N}$；
+    \item \textbf{局域态-局域态}（Case 2）：两个缺陷束缚态之间的跃迁，局域进行扰动，$|d_{ij}| \propto N^0$；
+    \item \textbf{局域态-延展态}（Case 3）：缺陷态与 Bloch 态之间的跃迁，$|d_{ij}| \propto 1/\sqrt{N}$。
+\end{enumerate}
+
+本报告将通过一维模型的数值计算，定量验证上述三类标度律。
+
+\section{理论框架}
+
+\subsection{非绝热耦合的定义}
+
+非绝热耦合（NAC）定义为电子态随时间的演化在两态间的矩阵元：
+\begin{equation}
+    d_{ij} = \bra{\psi_i} \frac{\dd}{\dd t} \ket{\psi_j}
+    \label{eq:nac_basic}
+\end{equation}
+利用链式法则 $\frac{\dd}{\dd t} = \nabla_{\mathbf{R}} \cdot \dot{\mathbf{R}}$ 与 Hellmann-Feynman 定理，得：
+\begin{equation}
+    d_{ij} = \frac{1}{\Delta E_{ij}} \bra{\psi_i} \nabla_{\mathbf{R}} H \ket{\psi_j} \cdot \dot{\mathbf{R}}
+    \label{eq:nac_hf}
+\end{equation}
+其中 $\Delta E_{ij} = E_j - E_i$。
+
+在模态分析框架下，核位移用简正坐标 $Q_{q\nu}$ 展开（$q$ 为波矢，$\nu$ 为支标）。定义电声耦合矩阵元（不包含超胞归一化因子 $1/\sqrt{N}$）：
+\begin{equation}
+    g_{ij,\nu}(q) = \bra{\psi_i} \frac{\partial H}{\partial Q_{q\nu}} \ket{\psi_j}
+    \label{eq:g_def}
+\end{equation}
+则 NAC 可写为：
+\begin{equation}
+    d_{ij} = \frac{1}{\Delta E_{ij}} \frac{1}{\sqrt{N}} \sum_{q,\nu} g_{ij,\nu}(q) \, \dot{Q}_{q\nu}
+    \label{eq:nac_modal}
+\end{equation}
+热平均均方值为：
+\begin{equation}
+    \mean{|d_{ij}|^2} = \frac{1}{N\,(\Delta E_{ij})^2} \sum_{q,\nu} |g_{ij,\nu}(q)|^2 \mean{|\dot{Q}_{q\nu}|^2}
+    \label{eq:nac_mean_square}
+\end{equation}
+
+\subsection{一维模型}
+
+\subsubsection{单带紧束缚模型}
+
+考虑 $N$ 个格点的一维原子链，最近邻跳跃积分为 $t_0$，哈密顿量为：
+\begin{equation}
+    H = \sum_n \varepsilon_n c_n^\dagger c_n + t_0 \sum_n \left( c_n^\dagger c_{n+1} + \text{h.c.} \right)
+\end{equation}
+纯净体系（$\varepsilon_n = 0$）的本征态为 Bloch 态：
+\begin{equation}
+    \ket{\psi_k} = \frac{1}{\sqrt{N}} \sum_n e^{\ii k n a} \ket{n}
+\end{equation}
+色散关系为 $E(k) = 2t_0 \cos(ka)$。
+
+声子采用单原子链模型，色散关系为：
+\begin{equation}
+    \omega_q = \sqrt{\frac{2K}{M}} \left| \sin\left(\frac{qa}{2}\right) \right|
+\end{equation}
+其中 $K$ 为弹簧常数，$M$ 为原子质量。本报告采用无量纲化单位（$K=M=a=1$），仅关心标度行为。
+
+\subsubsection{SSH 双带模型}
+
+SSH（Su-Schrieffer-Heeger）模型描述具有交替跳跃积分的双原子链：
+\begin{equation}
+    H = \sum_n \left[ v \, c_{n,A}^\dagger c_{n,B} + w \, c_{n,B}^\dagger c_{n+1,A} + \text{h.c.} \right]
+\end{equation}
+其中 $v = t_0 + \delta t$（胞内），$w = t_0 - \delta t$（胞间）。Bloch 哈密顿量为：
+\begin{equation}
+    H(k) = \begin{pmatrix} 0 & v + w e^{-\ii k a} \\ v + w e^{\ii k a} & 0 \end{pmatrix}
+\end{equation}
+能带为：
+\begin{equation}
+    E_\pm(k) = \pm \sqrt{v^2 + w^2 + 2vw \cos(ka)}
+\end{equation}
+
+图~\ref{fig:model} 展示了两种模型的示意图。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{../results/publication_figures/fig1_model_schematic.png}
+    \caption{一维紧束缚模型示意图。(a) 单原子链，跳跃积分均为 $t_0$；(b) SSH 双原子链，胞内跳跃 $v$，胞间跳跃 $w$。}
+    \label{fig:model}
+\end{figure}
+
+\subsection{电子态分类}
+
+根据逆参与比（Inverse Participation Ratio, IPR）对电子态进行分类：
+\begin{equation}
+    \text{IPR} = \sum_n |\psi_n|^4
+\end{equation}
+延展态的 IPR $\propto 1/N$，趋于零；局域态的 IPR $\sim O(1)$，与尺寸无关。本报告采用 $\text{IPR} \geq 0.05$ 作为局域态的判据。
+
+为产生局域态，在晶格中引入方势阱缺陷（宽度 5 个格点，深度 $-1.5\,t_0$）。图~\ref{fig:wavefunction} 展示了三类电子态的波函数分布与 IPR 谱。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../results/publication_figures/fig2_wavefunctions.png}
+    \caption{三类电子态的波函数与 IPR 谱（$N=80$）。上排：波函数概率密度 $|\psi|^2$；下排：IPR 随能量的分布，红色虚线为局域态判据 $\text{IPR}=0.05$，星号标记所选态。(a,d) Case 1：两个延展态（纯净 Bloch 态，与下排灰点非同一哈密顿量）；(b,e) Case 2：两个局域态（含缺陷体系本征态）；(c,f) Case 3：一个局域态与一个延展态。}
+    \label{fig:wavefunction}
+\end{figure}
+
+\subsection{标度律的物理图像}
+
+\subsubsection{Case 1：延展态-延展态}
+
+两个 Bloch 态 $\ket{k_1}$、$\ket{k_2}$ 之间的电声耦合矩阵元为：
+\begin{equation}
+    g(q) = \bra{k_1} \frac{\partial H}{\partial Q_q} \ket{k_2} \propto \frac{1}{N} \sum_n e^{\ii(k_2 - k_1 - q)na}
+\end{equation}
+相位求和给出动量守恒选择定则 $k_2 = k_1 + q + G$（$G$ 为倒格矢），仅满足此条件的 $q$ 模式贡献非零矩阵元。对于延展态-延展态，电子态归一化与全空间相位求和使得 $|g(q_0)|^2$ 随 $N$ 近似为常数；而式~\eqref{eq:nac_modal} 中显式的 $1/\sqrt{N}$（等价于式~\eqref{eq:nac_mean_square} 的 $1/N$）给出最终标度 $\mean{|d_{ij}|^2} \propto N^{-1}$。跃迁能量差 $\Delta E_{ij}$ 与 $N$ 无关，因此不影响标度指数。
+
+\textbf{说明}：单带模型无法定义同一 $k$ 点的两个态，因此用 $k_1 \neq k_2$ 的情况（记为 Case 1$'$）验证延展-延展标度律；SSH 双带模型则可验证同 $k$ 点的价带-导带（VBM-CBM）跃迁。
+
+\subsubsection{Case 2：局域态-局域态}
+
+两个局域态均束缚在缺陷附近，没有确定的晶体动量。电声耦合的有效积分区域被限制在缺陷周围的有限原子数内，与系统尺寸无关。因此 $\mean{|d_{ij}|^2} \propto N^0$。
+
+\subsubsection{Case 3：局域态-延展态}
+
+一端为局域态（无确定 $k$），另一端为延展态（振幅 $\propto 1/\sqrt{N}$）。积分区域受局域态限制，但延展态的归一化贡献 $1/\sqrt{N}$ 因子。综合结果为 $\mean{|d_{ij}|^2} \propto N^{-1}$。
+
+图~\ref{fig:gq} 展示了三种情况下电声耦合矩阵元 $|g(q)|^2$ 在布里渊区的分布，直观反映了动量选择定则的差异。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../results/publication_figures/fig4_gq_distribution.png}
+    \caption{电声耦合矩阵元 $|g(q)|^2$ 的分布（$N=80$）。(a) Case 1：仅在满足动量守恒的 $q_0$ 处出现 $\delta$ 峰；(b) Case 2：宽分布，多个 $q$ 模式贡献；(c) Case 3：宽分布，但整体幅度因延展态归一化而降低。}
+    \label{fig:gq}
+\end{figure}
+
+\section{计算方法}
+
+\subsection{解析计算路径}
+
+\begin{enumerate}
+    \item \textbf{电子态}：纯净体系采用显式 Bloch 构造；含缺陷体系对角化实空间哈密顿量。
+    \item \textbf{声子模式}：单原子链采用解析色散；SSH 模型求解 $2\times2$ 动力学矩阵，得到光学支与声学支。
+    \item \textbf{电声耦合}：计算 $g_{ij,\nu}(q) = \bra{\psi_i} \partial H / \partial Q_{q\nu} \ket{\psi_j}$。
+    \item \textbf{NAC 均方值}：根据公式~\eqref{eq:nac_mean_square} 对 $(q,\nu)$ 求和，经典极限下 $\mean{|\dot{Q}_{q\nu}|^2} = k_B T$。
+\end{enumerate}
+
+\subsection{数值验证路径}
+
+为验证解析方法的正确性，采用有限差分法直接计算 NAC：
+\begin{equation}
+    d_{ij} \approx \frac{\braket{\psi_i(Q)}{\psi_j(Q+\delta Q)} - \braket{\psi_i(Q)}{\psi_j(Q-\delta Q)}}{2\delta Q}
+    \label{eq:finite_diff}
+\end{equation}
+计算中需注意：
+\begin{itemize}
+    \item \textbf{相位对齐}：确保 $\psi(Q\pm\delta Q)$ 与 $\psi(Q)$ 的整体相位一致；
+    \item \textbf{退化态处理}：对于 $k$ 与 $-k$ 简并的情况，在简并子空间内选择与未扰动态重叠最大的线性组合。采用能量容差 $10^{-6}$ 识别简并态。
+\end{itemize}
+
+\subsection{参数设置}
+
+\begin{table}[htbp]
+    \centering
+    \caption{计算参数}
+    \begin{tabular}{lll}
+        \toprule
+        参数       & 符号         & 值                                            \\
+        \midrule
+        系统尺寸     & $N$        & 20, 40, 60, 80, 120, 160, 240, 320, 480, 640 \\
+        跳跃积分     & $t_0$      & 1.0                                          \\
+        SSH 交替参数 & $\delta t$ & 0.2                                          \\
+        电声耦合     & $\alpha$   & 0.5                                          \\
+        弹簧常数     & $K$        & 1.0                                          \\
+        温度       & $T$        & 300 K                                        \\
+        缺陷宽度     & -          & 5 格点                                         \\
+        缺陷深度     & -          & $-1.5\,t_0$                                  \\
+        IPR 阈值   & -          & 0.05                                         \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:params}
+\end{table}
+
+\section{结果}
+
+\subsection{单带模型标度律验证}
+
+图~\ref{fig:scaling_simple} 展示单带紧束缚模型的标度律验证结果。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../results/publication_figures/fig3_scaling_laws.png}
+    \caption{单带模型 NAC 标度律验证。(a) Case 1$'$（$k_1 \neq k_2$）：$\mean{|d_{ij}|^2}$ 对 $N$ 的双对数图，拟合得 $\beta = 1.00$；(b) Case 2：$\mean{|d_{ij}|^2}$ 几乎不随 $N$ 变化，相对标准差 $\sigma/\mu = 2.3\times10^{-4}\%$；(c) Case 3：拟合得 $\beta = 1.00$；(d) 结果汇总表。虚线为拟合曲线，点线为理论预期。}
+    \label{fig:scaling_simple}
+\end{figure}
+
+定量结果汇总如下：
+
+\begin{table}[htbp]
+    \centering
+    \caption{单带模型标度律拟合结果}
+    \begin{tabular}{ccccc}
+        \toprule
+        Case & 类型      & 理论预期        & 拟合结果                    & 拟合质量          \\
+        \midrule
+        1$'$ & Ext-Ext & $\beta = 1$ & $\beta = 1.00 \pm 0.00$ & $R^2 = 1.000$ \\
+        2    & Loc-Loc & $\beta = 0$ & $\sigma/\mu = 2.3\times10^{-4}\%$  & 常数稳定          \\
+        3    & Loc-Ext & $\beta = 1$ & $\beta = 1.00 \pm 0.00$ & $R^2 = 1.000$ \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:simple_results}
+\end{table}
+
+三类情况的拟合指数均与理论预期精确一致。
+
+\subsection{SSH 模型标度律验证}
+
+图~\ref{fig:scaling_ssh} 展示 SSH 双带模型的结果，与单带模型定性一致。SSH 模型的 Case 1 采用同一 $k$ 点的价带-导带跃迁，更接近实际材料中直接带隙的情形。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../results/publication_figures/fig6_ssh_scaling.png}
+    \caption{SSH 模型 NAC 标度律验证。(a) Case 1（同 $k$ 的 VBM-CBM）：$\beta = 1.00$；(b) Case 2：$\sigma/\mu \approx 0\%$；(c) Case 3：$\beta = 1.00$。}
+    \label{fig:scaling_ssh}
+\end{figure}
+
+\subsection{折叠声子效应}
+
+当系统扩胞时，布里渊区缩小，多个声子分支折叠到超胞的 $\Gamma$ 点。理论分析表明，并非所有折叠分支都对 NAC 有贡献——只有满足动量守恒的原始 $q$ 值对应的分支才贡献非零矩阵元。
+
+图~\ref{fig:folded} 验证了这一选择定则：在 5 倍超胞中，5 个折叠声子分支中仅有 1 个具有非零耦合强度。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{../results/publication_figures/fig5_folded_phonon.png}
+    \caption{折叠声子选择定则验证。(a) 单原子链 5 倍超胞：5 个分支中仅 1 个非零（满足动量守恒）；(b) SSH 模型 2 倍超胞：Mode I（光学支，胞内相对运动）贡献非零，Mode II（$q=\pi/a$ 折叠分支）因相位相消而为零。}
+    \label{fig:folded}
+\end{figure}
+
+\subsection{诊断与一致性检查}
+
+图~\ref{fig:diagnostics} 展示辅助诊断结果，验证计算各环节的正确性。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{../results/publication_figures/fig7_diagnostics.png}
+    \caption{诊断图。(a,d) 跃迁能量差 $\Delta E_{ij}$ 与 $N$ 无关（单带数值为负是因为 $E(k_2) < E(k_1)$）；(b,e) 单模耦合强度 $|g(q_0)|^2$ 随 $N$ 近似为常数（$N^0$）；(c,f) 声子位移场归一化检验，$\sum|u|^2$ 保持常数。对于 Case 1，$\mean{|d|^2}$ 的 $N^{-1}$ 标度来自式~\eqref{eq:nac_modal} 的显式 $1/\sqrt{N}$（等价于式~\eqref{eq:nac_mean_square} 的 $1/N$）。}
+    \label{fig:diagnostics}
+\end{figure}
+
+诊断结果表明：
+\begin{itemize}
+    \item 跃迁能量差 $\Delta E_{ij}$ 对于选定的 $k$ 点组合（远离布里渊区边界）与系统尺寸无关；
+    \item 单模耦合强度 $|g(q_0)|^2$ 随 $N$ 近似为常数；Case 1 的 $N^{-1}$ 标度由式~\eqref{eq:nac_modal} 的显式 $1/\sqrt{N}$ 给出；
+    \item 声子位移场的归一化守恒，确认了坐标变换的正确性。
+\end{itemize}
+
+\section{数值方法验证}
+
+为确认解析框架的正确性，将解析方法与有限差分数值方法进行对比（图~\ref{fig:numerical}）。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{../results/publication_figures/fig_appendix_numerical_verification.png}
+    \caption{解析方法与有限差分数值方法对比。(a,c) NAC 绝对值随 $N$ 的变化，两种方法曲线完全重合；(b,d) 相对误差，均远低于 $10^{-4}$ 目标阈值。}
+    \label{fig:numerical}
+\end{figure}
+
+\begin{table}[htbp]
+    \centering
+    \caption{解析与数值方法一致性}
+    \begin{tabular}{ccc}
+        \toprule
+        模型    & 最大相对误差              & 平均相对误差              \\
+        \midrule
+        单带 TB & $7.3\times10^{-9}$  & $2.6\times10^{-9}$  \\
+        SSH   & $9.7\times10^{-10}$ & $3.4\times10^{-10}$ \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:numerical}
+\end{table}
+
+两种方法的相对误差在 $10^{-9}$ 量级，远优于 $10^{-4}$ 的验收标准，确认解析推导与数值实现均正确。
+
+\section{讨论}
+
+\subsection{结果的物理意义}
+
+数值验证结果支持理论预测的三因子分析框架：
+\begin{itemize}
+    \item \textbf{延展态-延展态}：动量守恒限制使得仅单一 $q$ 模式贡献，且 $|g(q_0)|^2 \sim N^0$；$\mean{|d_{ij}|^2} \propto N^{-1}$ 的标度来自公式~\eqref{eq:nac_modal}（等价于~\eqref{eq:nac_mean_square}）中的显式 $1/N$ 因子；
+    \item \textbf{局域态-局域态}：电子态和有效扰动区域均局域，NAC 与系统尺寸解耦；
+    \item \textbf{局域态-延展态}：延展态的 $1/\sqrt{N}$ 归一化因子主导标度行为。
+\end{itemize}
+
+
+\subsection{方法的局限性}
+
+\begin{itemize}
+    \item \textbf{模型简化}：一维链、最近邻跳跃、谐振子声子，未考虑长程相互作用与非谐效应；
+    \item \textbf{电子关联}：紧束缚模型为单电子近似，未包含多体效应。
+\end{itemize}
+
+\section{结论}
+
+本报告通过一维紧束缚模型的数值计算，验证了非绝热耦合的尺寸标度律：
+
+\begin{enumerate}
+    \item \textbf{延展态-延展态}：$\mean{|d_{ij}|^2} \propto N^{-1}$，拟合指数 $\beta = 1.00$，$R^2 = 1.000$；
+    \item \textbf{局域态-局域态}：$\mean{|d_{ij}|^2} \propto N^0$，相对标准差 $\sigma/\mu < 0.1\%$；
+    \item \textbf{局域态-延展态}：$\mean{|d_{ij}|^2} \propto N^{-1}$，拟合指数 $\beta = 1.00$，$R^2 = 1.000$。
+\end{enumerate}
+
+上述结论在单带紧束缚模型与 SSH 双带模型中均成立。解析方法与有限差分数值方法的相对误差小于 $10^{-8}$，确认了理论框架的正确性。折叠声子选择定则同时得到数值验证。
+
+
+%=============================================================================
+\newpage
+\section*{附录：计算流程与代码结构}
+%=============================================================================
+
+\subsection*{A.1 核心计算目标}
+
+\textbf{目标}：计算 NAC 均方值 $\mean{|d_{ij}|^2}$ 随系统尺寸 $N$ 的标度关系。
+
+根据公式~\eqref{eq:nac_mean_square}：
+\[
+    \mean{|d_{ij}|^2} = \frac{1}{N(\Delta E_{ij})^2} \sum_{q,\nu} |g_{ij,\nu}(q)|^2 \mean{|\dot{Q}_{q\nu}|^2}
+\]
+需要计算四个量：
+\begin{enumerate}[label=(\alph*)]
+    \item 电子态 $|\psi_i\rangle$, $|\psi_j\rangle$ 及能量差 $\Delta E_{ij}$
+    \item 声子模态 $\omega_{q\nu}$ 及偏振矢量 $\mathbf{e}_{q\nu}$
+    \item 电声耦合矩阵元 $g_{ij,\nu}(q)$
+    \item 模态速度热平均 $\mean{|\dot{Q}_{q\nu}|^2}$
+\end{enumerate}
+
+\subsection*{A.2 计算依赖树}
+
+\begin{verbatim}
+mean_square_nac(g_qnu, delta_e, qdot_var, n_cells) [nac.py]
+|-- g_qnu = g_ij(q,nu)                             [electron_phonon.py]
+|   |-- psi_i, psi_j                               [electron states]
+|   |   |-- bloch_state(N, k)                      [tb_electron_1band.py]
+|   |   +-- diagonalize(H)                         [tb_electron_1band.py]
+|   |       +-- H = build_hamiltonian(N, t0, onsite)
+|   |-- dH/dQ_q = dh_dq_monatomic(q, alpha)        [electron_phonon.py]
+|   +-- evec_qnu                                   [phonon polarization]
+|       +-- diatomic_modes(q, K, M_A, M_B)         [phonon_diatomic.py]
+|-- delta_e = E_j - E_i
+|   +-- dispersion(k, t0) / band_energies(k)       [tb/ssh_electron.py]
++-- qdot_var = <|Qdot|^2>
+    +-- qdot_variance(omega, T, mode)              [nac.py]
+        +-- omega = dispersion_monatomic(q, K, M)  [phonon_1atom.py]
+\end{verbatim}
+
+\subsection*{A.3 关键公式与实现对应}
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{p{4.5cm}p{5.5cm}p{4cm}}
+        \toprule
+        \textbf{物理量} & \textbf{公式}                                                             & \textbf{代码位置}                             \\
+        \midrule
+        Bloch 态      & $|\psi_k\rangle = \frac{1}{\sqrt{N}} \sum_n e^{ikna} |n\rangle$         & \texttt{tb\_electron\_1band.py:54}        \\[0.5em]
+        TB 色散        & $E(k) = 2t_0 \cos(ka)$                                                  & \texttt{tb\_electron\_1band.py:60}        \\[0.5em]
+        SSH 能带       & $E_\pm = \pm\sqrt{v^2+w^2+2vw\cos(ka)}$                                 & \texttt{ssh\_electron.py:band\_energies}  \\[0.5em]
+        声子色散         & $\omega_q = \sqrt{2K/M}|\sin(qa/2)|$                                    & \texttt{phonon\_1atom.py:52}              \\[0.5em]
+        电声耦合         & $g = \langle\psi_i|\partial H/\partial Q_q|\psi_j\rangle$               & \texttt{electron\_phonon.py:g\_monatomic} \\[0.5em]
+        模态热平均        & $\langle|\dot{Q}|^2\rangle = k_B T$ (经典)                                & \texttt{nac.py:12}                        \\[0.5em]
+        NAC 均方       & $\langle|d|^2\rangle = \frac{1}{N}\sum|g|^2\langle|\dot{Q}|^2\rangle/(\Delta E)^2$ & \texttt{nac.py:29}                        \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\noindent\textbf{约定说明}：代码中电声耦合矩阵元 $g$ 的定义不包含超胞归一化因子 $1/\sqrt{N}$。对应地，NAC 均方公式在 \texttt{mean\_square\_nac} 中显式包含 $1/N$（通过参数 \texttt{n\_cells} 传入），与讨论总结的记号约定一致。
+
+\subsection*{A.4 数值验证模块}
+
+有限差分验证采用独立的计算路径，与解析方法互校。由于位移场 $u_n = \frac{1}{\sqrt{NM}}\sum_q Q_q e^{iqna}$ 的傅里叶变换约定，数值有限差分自然包含 $1/\sqrt{N}$；为对齐约定，解析侧除以 $\sqrt{N}$：
+
+\begin{verbatim}
+compare_analytical_numerical(N, model_type)        [experiments_numerical_check.py]
+|-- analytical: g / (delta_e * sqrt(N))            [align normalization]
++-- numerical: finite_diff_nac(psi_i, psi_j, H, Q) [numerical_nac.py]
+    |-- H(Q+dQ), H(Q-dQ)                           [displaced Hamiltonian]
+    |-- psi_j(Q+/-dQ) = diagonalize(H(Q+/-dQ))     [re-diagonalize]
+    |-- align_phase(psi_new, psi_ref)              [phase alignment]
+    |-- project_degenerate(psi, E, tol=1e-6)       [degenerate projection]
+    +-- d_ij = <psi_i|(psi_j(+)-psi_j(-))>/(2dQ)   [central difference]
+\end{verbatim}
+
+\subsection*{A.5 复现脚本}
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \begin{tabular}{ll}
+        \toprule
+        \textbf{脚本}                                & \textbf{功能}              \\
+        \midrule
+        \texttt{experiments\_simple.py}            & 单带模型 Case 1$'$/2/3 标度律   \\
+        \texttt{experiments\_ssh.py}               & SSH 模型 Case 1/2/3 + 折叠声子 \\
+        \texttt{experiments\_numerical\_check.py}  & 解析 vs 数值方法对比             \\
+        \texttt{generate\_publication\_figures.py} & 生成 Fig.1--7              \\
+        \texttt{verify\_numerical\_nac.py}         & 生成 Fig.8（数值验证）           \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\end{document}
