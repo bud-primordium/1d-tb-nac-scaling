@@ -189,8 +189,6 @@ def generate_figure1_model_schematic(output_dir: Path):
     ax.set_aspect('equal')
     ax.axis('off')
     ax.set_title('(b) SSH diatomic chain', fontsize=11)
-    # 将legend移到图外下方
-    ax.legend(loc='lower center', fontsize=8, ncol=2, bbox_to_anchor=(0.5, -0.15))
 
     plt.tight_layout()
     fig.savefig(output_dir / "fig1_model_schematic.png")
@@ -238,7 +236,7 @@ def generate_figure2_wavefunctions(output_dir: Path):
     axes[0, 0].set_xlim(0, n_cells)
 
     axes[0, 1].fill_between(x, 0, np.abs(psi_loc1)**2, alpha=0.7, color=COLORS['case2'], label='L1')
-    axes[0, 1].fill_between(x, 0, np.abs(psi_loc2)**2, alpha=0.5, color=COLORS['case2'], label='L2')
+    axes[0, 1].fill_between(x, 0, np.abs(psi_loc2)**2, alpha=0.6, color=COLORS['highlight'], label='L2')
     axes[0, 1].set_title('(b) Case 2: Localized', fontsize=10)
     axes[0, 1].legend(fontsize=7, loc='upper right')
     axes[0, 1].set_xlim(0, n_cells)
@@ -332,7 +330,7 @@ def generate_figure3_scaling_laws(output_dir: Path):
     ax.set_xscale('log')
     ax.set_xlabel('$N$')
     ax.set_ylabel(r'$\langle d^2 \rangle$')
-    ax.set_title(f'(b) Case 2: Loc-Loc\n$\\langle d^2 \\rangle = {mean_d2:.2e} \\pm {rel_std:.1f}\\%$', fontsize=10)
+    ax.set_title(f'(b) Case 2: Loc-Loc\n$\\langle d^2 \\rangle = {mean_d2:.3e}, \\sigma/\\mu = {rel_std:.2e}$', fontsize=10)
     ax.legend(fontsize=8, loc='upper right')
 
     # (c) Case 3
@@ -362,13 +360,13 @@ def generate_figure3_scaling_laws(output_dir: Path):
     cell_text = [
         ['Case', 'Type', 'Expected', 'Result', 'Quality'],
         ['1', 'Ext-Ext', r'$\beta=1$', f'$\\beta={beta1:.2f}$', f'$R^2={r2_1:.3f}$'],
-        ['2', 'Loc-Loc', 'const', f'$\\sigma/\\mu={rel_std:.1f}\\%$', 'Stable' if rel_std < 5 else 'Varies'],
+        ['2', 'Loc-Loc', 'const', f'$\\sigma/\\mu={rel_std:.2e}$', 'Stable' if rel_std < 5 else 'Varies'],
         ['3', 'Loc-Ext', r'$\beta=1$', f'$\\beta={beta3:.2f}$', f'$R^2={r2_3:.3f}$'],
     ]
 
     table = ax.table(cellText=cell_text[1:], colLabels=cell_text[0],
                      loc='center', cellLoc='center',
-                     colWidths=[0.12, 0.18, 0.18, 0.28, 0.18])
+                     colWidths=[0.15, 0.20, 0.24, 0.40, 0.30])
     table.auto_set_font_size(False)
     table.set_fontsize(9)
     table.scale(1.2, 1.5)
