@@ -58,15 +58,21 @@ def case1_scaling(
     mass_a: float = 1.0,
     mass_b: float = 1.0,
     mode: str = "classical",
+    r_k: float = 0.1,
 ) -> CaseResult:
-    """Case 1：同 k 的 VBM–CBM。"""
+    """Case 1：同 k 的 VBM–CBM（延展态对）。
+
+    注意：避免使用 BZ 边界 k=π/a，因为该处 VBM-CBM 跃迁被对称性禁止。
+    使用 r_k 参数指定 k = 2π * r_k / a 的位置。
+    """
     d2_vals = []
     delta_e_vals = []
     for n_cells in n_vals:
-        k_gap = select_gap_k(n_cells, t0=t0, delta_t=delta_t, a=a)
-        evals_k, evecs_k = bloch_eigensystem(k_gap, t0=t0, delta_t=delta_t, a=a)
-        psi_v = bloch_state(n_cells, k_gap, evecs_k[:, 0], a=a)
-        psi_c = bloch_state(n_cells, k_gap, evecs_k[:, 1], a=a)
+        # 使用远离 BZ 边界的 k 点，避免对称性禁止
+        k_ext, _ = select_k_from_ratio(n_cells, r_k, a=a)
+        evals_k, evecs_k = bloch_eigensystem(k_ext, t0=t0, delta_t=delta_t, a=a)
+        psi_v = bloch_state(n_cells, k_ext, evecs_k[:, 0], a=a)
+        psi_c = bloch_state(n_cells, k_ext, evecs_k[:, 1], a=a)
         delta_e = float(evals_k[1] - evals_k[0])
 
         omega_q, evec_q = diatomic_modes(0.0, k_spring, mass_a, mass_b, a=a)
@@ -105,12 +111,23 @@ def folded_phonon_demo(
     mass_a: float = 1.0,
     mass_b: float = 1.0,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """折叠声子验证：比较两种位移纹理的一阶耦合。"""
+    """折叠声子验证：比较两种位移纹理的一阶耦合。
+
+    演示只有光学型模式（胞内相对运动）有非零耦合，
+    而声学型模式（胞内同相运动）耦合为零。
+    """
     _ = k_spring
-    k_gap = select_gap_k(n_cells, t0=t0, delta_t=delta_t, a=a)
-    evals_k, evecs_k = bloch_eigensystem(k_gap, t0=t0, delta_t=delta_t, a=a)
-    psi_v = bloch_state(n_cells, k_gap, evecs_k[:, 0], a=a)
-    psi_c = bloch_state(n_cells, k_gap, evecs_k[:, 1], a=a)
+    # 对于 n_cells=2，只有 k=0 和 k=π/a 两个点
+    # k=π/a 被对称性禁止，所以用 k=π/(2a)，这需要 n_cells≥4
+    # 对于 n_cells=2，直接用 k=π/(4a) 作为连续近似
+    if n_cells == 2:
+        k_ext = np.pi / (4.0 * a)  # 使用非离散点，仅用于演示
+    else:
+        k_ext, _ = select_k_from_ratio(n_cells, 0.25, a=a)  # k = π/(2a)
+
+    evals_k, evecs_k = bloch_eigensystem(k_ext, t0=t0, delta_t=delta_t, a=a)
+    psi_v = bloch_state(n_cells, k_ext, evecs_k[:, 0], a=a)
+    psi_c = bloch_state(n_cells, k_ext, evecs_k[:, 1], a=a)
 
     if n_cells != 2:
         raise ValueError("折叠纹理示例建议使用 n_cells=2 的超胞")

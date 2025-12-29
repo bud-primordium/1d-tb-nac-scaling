@@ -182,7 +182,7 @@ def main() -> None:
     ensure_dirs()
     setup_plot_style()
 
-    n_vals = [40, 80, 160, 320]
+    n_vals = [20, 40, 60, 80, 120, 160, 240, 320, 480, 640]
     r1 = 1 / 10
     r2 = 3 / 10
     t0 = 1.0
