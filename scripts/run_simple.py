@@ -15,7 +15,13 @@ os.environ.setdefault("MPLCONFIGDIR", str(ROOT / ".mplconfig"))
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.diagnostics import find_localized_states, ipr
+from src.diagnostics import (
+    find_localized_states,
+    ipr,
+    select_bloch_states,
+    select_k_from_ratio,
+    top_ipr_indices,
+)
 from src.electron_phonon import g_monatomic
 from src.experiments_simple import case1_scaling, case2_scaling, case3_scaling, folded_phonon_demo
 from src.lattice import q_grid
@@ -58,11 +64,12 @@ def plot_case2_wavefunctions(
     h = build_hamiltonian(n_cells, t0=t0, onsite=onsite, pbc=True)
     evals, evecs = diagonalize(h)
     localized = find_localized_states(evecs, ipr_threshold)
-    if localized.size < 2:
-        raise ValueError("局域态数量不足，无法绘制 Case 2 波函数")
-    ipr_vals = np.array([ipr(evecs[:, i]) for i in localized])
-    order = np.argsort(ipr_vals)[::-1]
-    idx1, idx2 = localized[order[:2]]
+    if localized.size >= 2:
+        ipr_vals = np.array([ipr(evecs[:, i]) for i in localized])
+        order = np.argsort(ipr_vals)[::-1]
+        idx1, idx2 = localized[order[:2]]
+    else:
+        idx1, idx2 = top_ipr_indices(evecs, count=2)
 
     fig, ax = plt.subplots(figsize=(6, 3))
     ax.plot(np.abs(evecs[:, idx1]) ** 2, label=f"L1 (E={evals[idx1]:.3f})")
@@ -89,6 +96,7 @@ def plot_case3_gq_distribution(
     well_width: int,
     well_depth: float,
     ipr_threshold: float,
+    r_ext: float,
     a: float,
     mass: float,
 ) -> None:
@@ -101,10 +109,9 @@ def plot_case3_gq_distribution(
     if localized.size == 0:
         raise ValueError("未找到局域态，无法绘制 Case 3 g(q)")
     loc_idx = localized[np.argmax(ipr_vals[localized])]
-    ext_idx = int(np.argmin(ipr_vals))
-
     psi_i = evecs[:, loc_idx]
-    psi_j = evecs[:, ext_idx]
+    k_ext, _ = select_k_from_ratio(n_cells, r_ext, a=a)
+    psi_j = np.exp(1j * k_ext * np.arange(n_cells) * a) / np.sqrt(n_cells)
     q_vals = q_grid(n_cells, a=a)
     g_vals = np.array(
         [g_monatomic(psi_i, psi_j, n_cells, q, alpha, a=a, mass=mass) for q in q_vals]
@@ -132,11 +139,11 @@ def plot_debug_case1(
     gq0_list = []
     mode_count = []
     for n_cells in n_vals:
-        k1 = 2.0 * np.pi * r1 / a
-        k2 = 2.0 * np.pi * r2 / a
+        k1, k2, m1, m2 = select_bloch_states(n_cells, r1, r2, a=a)
         psi_i = np.exp(1j * k1 * np.arange(n_cells) * a) / np.sqrt(n_cells)
         psi_j = np.exp(1j * k2 * np.arange(n_cells) * a) / np.sqrt(n_cells)
-        q0 = k2 - k1
+        q_index = (m1 - m2) % n_cells
+        q0 = 2.0 * np.pi * q_index / (n_cells * a)
         delta_e = 2.0 * t0 * (np.cos(k2 * a) - np.cos(k1 * a))
         delta_e_list.append(delta_e)
 
@@ -176,8 +183,8 @@ def main() -> None:
     setup_plot_style()
 
     n_vals = [40, 80, 160, 320]
-    r1 = 1 / 4
-    r2 = 3 / 8
+    r1 = 1 / 10
+    r2 = 3 / 10
     t0 = 1.0
     alpha = 0.5
     k_spring = 1.0
@@ -209,7 +216,7 @@ def main() -> None:
         n_cells=40,
         r1=r1,
         r2=r2,
-        m_supercell=4,
+        m_supercell=5,
         t0=t0,
         alpha=alpha,
         a=a,
@@ -255,6 +262,7 @@ def main() -> None:
         well_width=5,
         well_depth=-1.5,
         ipr_threshold=0.05,
+        r_ext=r1,
         a=a,
         mass=mass,
         mode="classical",
@@ -269,6 +277,7 @@ def main() -> None:
         well_width=5,
         well_depth=-1.5,
         ipr_threshold=0.05,
+        r_ext=r1,
         a=a,
         mass=mass,
     )

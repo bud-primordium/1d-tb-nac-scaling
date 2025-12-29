@@ -7,7 +7,13 @@ from typing import List, Tuple
 
 import numpy as np
 
-from .diagnostics import find_localized_states, ipr, select_bloch_states
+from .diagnostics import (
+    find_localized_states,
+    ipr,
+    select_bloch_states,
+    select_k_from_ratio,
+    top_ipr_indices,
+)
 from .electron_phonon import g_monatomic, g_monatomic_grid
 from .lattice import k_grid, q_grid
 from .nac import mean_square_nac, qdot_variance
@@ -53,10 +59,11 @@ def case1_scaling(
     d2_vals = []
     delta_e_vals = []
     for n_cells in n_vals:
-        k1, k2, _, _ = select_bloch_states(n_cells, r1, r2, a=a)
+        k1, k2, m1, m2 = select_bloch_states(n_cells, r1, r2, a=a)
         psi_i = bloch_state(n_cells, k1, a=a)
         psi_j = bloch_state(n_cells, k2, a=a)
-        q0 = k2 - k1
+        q_index = (m1 - m2) % n_cells
+        q0 = 2.0 * np.pi * q_index / (n_cells * a)
 
         g_q0 = g_monatomic(psi_i, psi_j, n_cells, q0, alpha, a=a, mass=mass)
         omega_q0 = dispersion_monatomic(np.array([q0]), k_spring, mass)[0]
@@ -86,12 +93,16 @@ def folded_phonon_demo(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """折叠声子验证：返回折叠分支上的 g(q) 分布。"""
     _ = t0
-    k1, k2, _, _ = select_bloch_states(n_cells, r1, r2, a=a)
+    k1, k2, m1, m2 = select_bloch_states(n_cells, r1, r2, a=a)
     psi_i = bloch_state(n_cells, k1, a=a)
     psi_j = bloch_state(n_cells, k2, a=a)
-    q0 = k2 - k1
+    q_index = (m1 - m2) % n_cells
+    q0 = 2.0 * np.pi * q_index / (n_cells * a)
 
     q_branches = folded_q_branches(m_supercell, a=a, q_sc=0.0)
+    step = n_cells // m_supercell
+    if q_index % step != 0:
+        raise ValueError("折叠分支未命中 q0，请调整 m_supercell 或 k 点选择")
     g_vals = np.zeros_like(q_branches, dtype=complex)
     for idx, q in enumerate(q_branches):
         g_vals[idx] = g_monatomic(
@@ -128,11 +139,12 @@ def case2_scaling(
         evals, evecs = diagonalize(h)
 
         localized = find_localized_states(evecs, ipr_threshold)
-        if localized.size < 2:
-            raise ValueError("局域态数量不足，无法构造 Case 2")
-        ipr_vals = np.array([ipr(evecs[:, i]) for i in localized])
-        order = np.argsort(ipr_vals)[::-1]
-        idx1, idx2 = localized[order[:2]]
+        if localized.size >= 2:
+            ipr_vals = np.array([ipr(evecs[:, i]) for i in localized])
+            order = np.argsort(ipr_vals)[::-1]
+            idx1, idx2 = localized[order[:2]]
+        else:
+            idx1, idx2 = top_ipr_indices(evecs, count=2)
         psi_i = evecs[:, idx1]
         psi_j = evecs[:, idx2]
         delta_e = float(evals[idx2] - evals[idx1])
@@ -162,6 +174,7 @@ def case3_scaling(
     well_width: int,
     well_depth: float,
     ipr_threshold: float,
+    r_ext: float,
     a: float = 1.0,
     mass: float = 1.0,
     mode: str = "classical",
@@ -179,11 +192,10 @@ def case3_scaling(
         if localized_indices.size == 0:
             raise ValueError("未找到局域态，无法构造 Case 3")
         loc_idx = localized_indices[np.argmax(ipr_vals[localized_indices])]
-        ext_idx = int(np.argmin(ipr_vals))
-
         psi_i = evecs[:, loc_idx]
-        psi_j = evecs[:, ext_idx]
-        delta_e = float(evals[ext_idx] - evals[loc_idx])
+        k_ext, _ = select_k_from_ratio(n_cells, r_ext, a=a)
+        psi_j = bloch_state(n_cells, k_ext, a=a)
+        delta_e = float(dispersion(k_ext, t0, a=a) - evals[loc_idx])
 
         q_vals = q_grid(n_cells, a=a)
         g_vals = g_monatomic_grid(psi_i, psi_j, n_cells, q_vals, alpha, a=a, mass=mass)

@@ -138,6 +138,7 @@ def main() -> None:
     alpha = 0.5
     k_spring = 1.0
     temperature = 300.0
+    r_ext = 1 / 10
     a = 1.0
     mass_a = 1.0
     mass_b = 1.0
@@ -191,6 +192,8 @@ def main() -> None:
         well_width=5,
         well_depth=-1.5,
         ipr_threshold=0.05,
+        r_ext=r_ext,
+        ext_band=0,
         a=a,
         mass_a=mass_a,
         mass_b=mass_b,

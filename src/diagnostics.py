@@ -39,6 +39,29 @@ def select_bloch_states(
     return k1, k2, m1_int, m2_int
 
 
+def select_k_from_ratio(
+    n_cells: int,
+    ratio: float,
+    a: float = 1.0,
+) -> Tuple[float, int]:
+    """根据有理分数 ratio 选择单个 k 点。"""
+    m_val = ratio * n_cells
+    m_int = int(round(m_val))
+    if not np.isclose(m_val, m_int):
+        raise ValueError("ratio 与 n_cells 不匹配，无法得到整数动量指标")
+    k_val = 2.0 * np.pi * m_int / (n_cells * a)
+    return k_val, m_int
+
+
+def top_ipr_indices(eigenvectors: np.ndarray, count: int = 2) -> np.ndarray:
+    """返回 IPR 最大的若干态索引。"""
+    if count <= 0:
+        raise ValueError("count 必须为正整数")
+    ipr_vals = np.array([ipr(eigenvectors[:, i]) for i in range(eigenvectors.shape[1])])
+    order = np.argsort(ipr_vals)[::-1]
+    return order[:count]
+
+
 def find_vbm_cbm_indices(eigenvalues: np.ndarray) -> Tuple[int, int]:
     """在能谱中寻找 VBM/CBM 的索引（假定费米能级在 0）。"""
     negative = np.where(eigenvalues <= 0.0)[0]

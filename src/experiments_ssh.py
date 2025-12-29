@@ -7,7 +7,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-from .diagnostics import ipr
+from .diagnostics import ipr, select_k_from_ratio, top_ipr_indices
 from .electron_phonon import g_ssh_diatomic, g_ssh_diatomic_grid, g_ssh_from_displacements
 from .lattice import k_grid, q_grid
 from .nac import mean_square_nac, qdot_variance
@@ -151,11 +151,12 @@ def case2_scaling(
 
         ipr_vals = np.array([ipr(evecs[:, i]) for i in range(evecs.shape[1])])
         localized = np.where(ipr_vals >= ipr_threshold)[0]
-        if localized.size < 2:
-            raise ValueError("局域态数量不足，无法构造 Case 2")
-        local_ipr = ipr_vals[localized]
-        order = np.argsort(local_ipr)[::-1]
-        idx1, idx2 = localized[order[:2]]
+        if localized.size >= 2:
+            local_ipr = ipr_vals[localized]
+            order = np.argsort(local_ipr)[::-1]
+            idx1, idx2 = localized[order[:2]]
+        else:
+            idx1, idx2 = top_ipr_indices(evecs, count=2)
         psi_i = evecs[:, idx1]
         psi_j = evecs[:, idx2]
         delta_e = float(evals[idx2] - evals[idx1])
@@ -196,6 +197,8 @@ def case3_scaling(
     well_width: int,
     well_depth: float,
     ipr_threshold: float,
+    r_ext: float,
+    ext_band: int = 0,
     a: float = 1.0,
     mass_a: float = 1.0,
     mass_b: float = 1.0,
@@ -214,11 +217,14 @@ def case3_scaling(
         if localized.size == 0:
             raise ValueError("未找到局域态，无法构造 Case 3")
         loc_idx = localized[np.argmax(ipr_vals[localized])]
-        ext_idx = int(np.argmin(ipr_vals))
-
         psi_i = evecs[:, loc_idx]
-        psi_j = evecs[:, ext_idx]
-        delta_e = float(evals[ext_idx] - evals[loc_idx])
+        k_ext, _ = select_k_from_ratio(n_cells, r_ext, a=a)
+        evals_k, evecs_k = bloch_eigensystem(k_ext, t0=t0, delta_t=delta_t, a=a)
+        band_idx = int(ext_band)
+        if band_idx not in (0, 1):
+            raise ValueError("ext_band 必须为 0（价带）或 1（导带）")
+        psi_j = bloch_state(n_cells, k_ext, evecs_k[:, band_idx], a=a)
+        delta_e = float(evals_k[band_idx] - evals[loc_idx])
 
         q_vals = q_grid(n_cells, a=a)
         omegas, evecs_q = diatomic_modes_grid(q_vals, k_spring, mass_a, mass_b, a=a)

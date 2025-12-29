@@ -72,6 +72,5 @@ def plot_scaling(
 
 
 def save_figure(fig: plt.Figure, path_base: str, dpi: int = 150) -> None:
-    """同时保存 PDF 和 PNG。"""
-    fig.savefig(f"{path_base}.pdf", bbox_inches="tight")
+    """保存 PNG 图像。"""
     fig.savefig(f"{path_base}.png", dpi=dpi, bbox_inches="tight")
