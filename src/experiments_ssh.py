@@ -11,7 +11,7 @@ from .diagnostics import ipr
 from .electron_phonon import g_ssh_diatomic, g_ssh_diatomic_grid, g_ssh_from_displacements
 from .lattice import k_grid, q_grid
 from .nac import mean_square_nac, qdot_variance
-from .phonon_diatomic import diatomic_modes_grid
+from .phonon_diatomic import diatomic_modes, diatomic_modes_grid
 from .ssh_electron import (
     bloch_eigensystem,
     bloch_state,
