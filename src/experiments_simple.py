@@ -85,6 +85,7 @@ def folded_phonon_demo(
     mass: float = 1.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """折叠声子验证：返回折叠分支上的 g(q) 分布。"""
+    _ = t0
     k1, k2, _, _ = select_bloch_states(n_cells, r1, r2, a=a)
     psi_i = bloch_state(n_cells, k1, a=a)
     psi_j = bloch_state(n_cells, k2, a=a)

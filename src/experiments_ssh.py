@@ -106,6 +106,7 @@ def folded_phonon_demo(
     mass_b: float = 1.0,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """折叠声子验证：比较两种位移纹理的一阶耦合。"""
+    _ = k_spring
     k_gap = select_gap_k(n_cells, t0=t0, delta_t=delta_t, a=a)
     evals_k, evecs_k = bloch_eigensystem(k_gap, t0=t0, delta_t=delta_t, a=a)
     psi_v = bloch_state(n_cells, k_gap, evecs_k[:, 0], a=a)
