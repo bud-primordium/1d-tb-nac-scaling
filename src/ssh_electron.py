@@ -15,6 +15,8 @@ def build_hamiltonian(
     delta_t: float = 0.2,
     onsite: Optional[np.ndarray] = None,
     pbc: bool = True,
+    displacements: Optional[np.ndarray] = None,
+    alpha: float = 0.0,
 ) -> np.ndarray:
     """构造 SSH 两带哈密顿量（A1,B1,A2,B2 顺序）。"""
     size = 2 * n_cells
@@ -22,6 +24,19 @@ def build_hamiltonian(
         onsite = np.zeros(size, dtype=float)
     if onsite.shape[0] != size:
         raise ValueError("onsite 长度必须为 2*n_cells")
+
+    u_a = None
+    u_b = None
+    if displacements is not None:
+        disp = np.asarray(displacements, dtype=complex)
+        if disp.shape == (2, n_cells):
+            u_a = disp[0]
+            u_b = disp[1]
+        elif disp.shape == (size,):
+            u_a = disp[0::2]
+            u_b = disp[1::2]
+        else:
+            raise ValueError("displacements 形状必须为 (2, n_cells) 或 (2*n_cells,)")
 
     h = np.zeros((size, size), dtype=complex)
     np.fill_diagonal(h, onsite)
@@ -32,8 +47,11 @@ def build_hamiltonian(
     for n in range(n_cells):
         a_idx = 2 * n
         b_idx = 2 * n + 1
-        h[a_idx, b_idx] += v
-        h[b_idx, a_idx] += v
+        hopping_intra = v
+        if u_a is not None and u_b is not None:
+            hopping_intra = v + alpha * (u_b[n] - u_a[n])
+        h[a_idx, b_idx] += hopping_intra
+        h[b_idx, a_idx] += np.conj(hopping_intra)
 
         n_next = n + 1
         if n_next >= n_cells:
@@ -41,8 +59,11 @@ def build_hamiltonian(
                 continue
             n_next = pbc_index(n_next, n_cells)
         a_next_idx = 2 * n_next
-        h[b_idx, a_next_idx] += w
-        h[a_next_idx, b_idx] += w
+        hopping_inter = w
+        if u_a is not None and u_b is not None:
+            hopping_inter = w + alpha * (u_a[n_next] - u_b[n])
+        h[b_idx, a_next_idx] += hopping_inter
+        h[a_next_idx, b_idx] += np.conj(hopping_inter)
 
     return h
 

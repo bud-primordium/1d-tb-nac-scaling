@@ -14,12 +14,18 @@ def build_hamiltonian(
     t0: float = 1.0,
     onsite: Optional[np.ndarray] = None,
     pbc: bool = True,
+    displacements: Optional[np.ndarray] = None,
+    alpha: float = 0.0,
 ) -> np.ndarray:
     """构造单带最近邻 TB 哈密顿量矩阵。"""
     if onsite is None:
         onsite = np.zeros(n_cells, dtype=float)
     if onsite.shape[0] != n_cells:
         raise ValueError("onsite 长度必须等于 n_cells")
+    if displacements is not None:
+        displacements = np.asarray(displacements, dtype=complex)
+        if displacements.shape[0] != n_cells:
+            raise ValueError("displacements 长度必须等于 n_cells")
 
     h = np.zeros((n_cells, n_cells), dtype=complex)
     np.fill_diagonal(h, onsite)
@@ -30,8 +36,11 @@ def build_hamiltonian(
             if not pbc:
                 continue
             n_next = pbc_index(n_next, n_cells)
-        h[n, n_next] += t0
-        h[n_next, n] += t0
+        hopping = t0
+        if displacements is not None:
+            hopping = t0 + alpha * (displacements[n_next] - displacements[n])
+        h[n, n_next] += hopping
+        h[n_next, n] += np.conj(hopping)
 
     return h
 
