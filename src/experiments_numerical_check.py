@@ -91,7 +91,8 @@ def compare_analytical_numerical(
         g_minus = g_monatomic(psi_i_ref, psi_j_ref, n_cells, -q0, alpha, a=a, mass=mass)
         g_analytical = (g_plus + g_minus) / np.sqrt(2.0)
         delta_e = dispersion(k2, t0, a=a) - dispersion(k1, t0, a=a)
-        nac_analytical = g_analytical / delta_e
+        # 注意：当前代码口径下 g 不含 1/sqrt(N)，与数值有限差分（对 Q 的导数）对齐时需除以 sqrt(N)
+        nac_analytical = g_analytical / (delta_e * np.sqrt(n_cells))
 
         q_vals = np.array([q0, -q0], dtype=float)
         q_amp = np.array([1.0 / np.sqrt(2.0), 1.0 / np.sqrt(2.0)], dtype=complex)
@@ -142,7 +143,8 @@ def compare_analytical_numerical(
             mass_a=mass_a,
             mass_b=mass_b,
         )
-        nac_analytical = g_analytical / delta_e
+        # 注意：当前代码口径下 g 不含 1/sqrt(N)，与数值有限差分（对 Q 的导数）对齐时需除以 sqrt(N)
+        nac_analytical = g_analytical / (delta_e * np.sqrt(n_cells))
 
         q_vals = np.array([0.0], dtype=float)
         q_amp = np.zeros((1, 2), dtype=complex)

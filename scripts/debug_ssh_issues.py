@@ -130,7 +130,7 @@ def diagnose_case2():
         from src.nac import mean_square_nac, qdot_variance
         delta_e = float(evals[idx2] - evals[idx1])
         qdot_var = qdot_variance(omegas, temperature=300.0, mode="classical")
-        d2 = mean_square_nac(g_vals, delta_e, qdot_var)
+        d2 = mean_square_nac(g_vals, delta_e, qdot_var, n_cells=n_cells)
 
         print(f"  delta_E = {delta_e:.6f}")
         print(f"  <d^2> = {d2:.6e}")
@@ -248,7 +248,7 @@ def diagnose_simple_case2():
         omegas = np.array([dispersion_monatomic(q, k_spring=1.0, mass=mass) for q in q_vals])
         delta_e = float(evals[idx2] - evals[idx1])
         qdot_var = qdot_variance(omegas, temperature=300.0, mode="classical")
-        d2 = mean_square_nac(g_vals[:, np.newaxis], delta_e, qdot_var[:, np.newaxis])
+        d2 = mean_square_nac(g_vals[:, np.newaxis], delta_e, qdot_var[:, np.newaxis], n_cells=n_cells)
 
         print(f"  <d^2> = {d2:.6e}")
 

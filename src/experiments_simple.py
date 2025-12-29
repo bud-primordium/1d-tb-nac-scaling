@@ -69,7 +69,7 @@ def case1_scaling(
         omega_q0 = dispersion_monatomic(np.array([q0]), k_spring, mass)[0]
         qdot_var = qdot_variance(np.array([omega_q0]), temperature, mode=mode)
         delta_e = dispersion(k2, t0, a=a) - dispersion(k1, t0, a=a)
-        d2 = mean_square_nac(np.array([g_q0]), delta_e, qdot_var)
+        d2 = mean_square_nac(np.array([g_q0]), delta_e, qdot_var, n_cells=n_cells)
 
         d2_vals.append(d2)
         delta_e_vals.append(delta_e)
@@ -153,7 +153,7 @@ def case2_scaling(
         g_vals = g_monatomic_grid(psi_i, psi_j, n_cells, q_vals, alpha, a=a, mass=mass)
         omegas = dispersion_monatomic(q_vals, k_spring, mass)
         qdot_var = qdot_variance(omegas, temperature, mode=mode)
-        d2 = mean_square_nac(g_vals, delta_e, qdot_var)
+        d2 = mean_square_nac(g_vals, delta_e, qdot_var, n_cells=n_cells)
 
         d2_vals.append(d2)
         delta_e_vals.append(delta_e)
@@ -201,7 +201,7 @@ def case3_scaling(
         g_vals = g_monatomic_grid(psi_i, psi_j, n_cells, q_vals, alpha, a=a, mass=mass)
         omegas = dispersion_monatomic(q_vals, k_spring, mass)
         qdot_var = qdot_variance(omegas, temperature, mode=mode)
-        d2 = mean_square_nac(g_vals, delta_e, qdot_var)
+        d2 = mean_square_nac(g_vals, delta_e, qdot_var, n_cells=n_cells)
 
         d2_vals.append(d2)
         delta_e_vals.append(delta_e)

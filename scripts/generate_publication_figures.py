@@ -608,9 +608,13 @@ def generate_figure7_diagnostics(output_dir: Path):
     axes[0, 0].set_xscale('log')
 
     axes[0, 1].loglog(n_vals, gq0_case1, 'o-', c=COLORS['case1'])
-    # 理论线
-    A = gq0_case1[0] * n_vals[0]
-    axes[0, 1].plot(n_vals, A / np.array(n_vals), ':', c=COLORS['theory'], label=r'$\propto N^{-1}$')
+    # 理论线：当前 g 定义不含 1/sqrt(N)，因此 |g(q0)|^2 ~ 常数
+    axes[0, 1].plot(n_vals, np.full_like(n_vals, gq0_case1[0], dtype=float), ':', c=COLORS['theory'], label=r'$\propto N^{0}$')
+    # 当数据在机器精度内近似常数时，log-log 的自动缩放可能会把 1e-16 量级的浮点噪声“放大”为可见锯齿；
+    # 这里固定一个合理的 y 轴范围，避免误导读者。
+    y0 = float(np.mean(gq0_case1))
+    if y0 > 0:
+        axes[0, 1].set_ylim(y0 * 0.5, y0 * 2.0)
     axes[0, 1].set_xlabel('$N$')
     axes[0, 1].set_ylabel(r'$|g(q_0)|^2$')
     axes[0, 1].set_title('(b) Single-mode coupling', fontsize=10)
@@ -659,8 +663,11 @@ def generate_figure7_diagnostics(output_dir: Path):
     axes[1, 0].set_xscale('log')
 
     axes[1, 1].loglog(n_vals, gq0_ssh, 'o-', c=COLORS['case2'])
-    A_ssh = gq0_ssh[0] * n_vals[0]
-    axes[1, 1].plot(n_vals, A_ssh / np.array(n_vals), ':', c=COLORS['theory'], label=r'$\propto N^{-1}$')
+    # 理论线：当前 g 定义不含 1/sqrt(N)，因此 |g(q=0)|^2 ~ 常数
+    axes[1, 1].plot(n_vals, np.full_like(n_vals, gq0_ssh[0], dtype=float), ':', c=COLORS['theory'], label=r'$\propto N^{0}$')
+    y0 = float(np.mean(gq0_ssh))
+    if y0 > 0:
+        axes[1, 1].set_ylim(y0 * 0.5, y0 * 2.0)
     axes[1, 1].set_xlabel('$N$')
     axes[1, 1].set_ylabel(r'$|g(q=0)|^2$')
     axes[1, 1].set_title('(e) SSH single-mode coupling', fontsize=10)

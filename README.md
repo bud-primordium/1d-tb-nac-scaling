@@ -79,9 +79,9 @@ python scripts/verify_numerical_nac.py
 ### 单带紧束缚模型
 
 哈密顿量：
-$$H = -t_0 \sum_n (c_n^\dagger c_{n+1} + \text{h.c.})$$
+$$H = t_0 \sum_n (c_n^\dagger c_{n+1} + \text{h.c.})$$
 
-色散关系：$E(k) = -2t_0 \cos(ka)$
+色散关系：$E(k) = 2t_0 \cos(ka)$
 
 ### SSH 双带模型
 
@@ -91,7 +91,8 @@ $$H = -t_0 \sum_n (c_n^\dagger c_{n+1} + \text{h.c.})$$
 
 ### NAC 标度律
 
-$$\langle d^2 \rangle = \frac{1}{(\Delta E)^2} \sum_q |g(q)|^2 \langle \dot{Q}_q^2 \rangle$$
+本仓库约定的电声耦合 $g_{ij,\nu}(q)=\langle i|\partial H/\partial Q_{q\nu}|j\rangle$ 不包含超胞归一化因子 $1/\sqrt{N}$，因此
+$$\langle |d|^2 \rangle = \frac{1}{N(\Delta E)^2} \sum_{q,\nu} |g_{ij,\nu}(q)|^2 \langle |\dot{Q}_{q\nu}|^2 \rangle$$
 
 - **Case 1 (Ext-Ext)**：动量守恒 → δ 峰 → $\langle d^2 \rangle \propto N^{-1}$
 - **Case 2 (Loc-Loc)**：局域扰动 → $\langle d^2 \rangle \propto N^0$

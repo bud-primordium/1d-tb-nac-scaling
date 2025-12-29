@@ -30,9 +30,17 @@ def mean_square_nac(
     g_qnu: np.ndarray,
     delta_e: float,
     qdot_var: np.ndarray,
+    n_cells: int,
 ) -> float:
-    """计算 ⟨|d_ij|^2⟩。"""
+    """计算 ⟨|d_ij|^2⟩。
+
+    公式：⟨|d|^2⟩ = (1/(N ΔE^2)) * Σ_{q,ν} |g_{ij,ν}(q)|^2 ⟨|Q̇_{q,ν}|^2⟩
+
+    注意：这里的 g 定义不包含超胞归一化因子 1/sqrt(N)，该因子在上式中以 1/N 显式出现。
+    """
+    if n_cells <= 0:
+        raise ValueError("n_cells 必须为正整数")
     if g_qnu.shape != qdot_var.shape:
         raise ValueError("g_qnu 与 qdot_var 形状必须一致")
     denom = float(delta_e) ** 2
-    return float(np.sum(np.abs(g_qnu) ** 2 * qdot_var) / denom)
+    return float(np.sum(np.abs(g_qnu) ** 2 * qdot_var) / (float(n_cells) * denom))

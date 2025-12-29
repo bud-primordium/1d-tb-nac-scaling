@@ -17,9 +17,13 @@ def dh_dq_monatomic(
     mass: float = 1.0,
     pbc: bool = True,
 ) -> np.ndarray:
-    """构造单原子链 SSH 型耦合的 dH/dQ_q。"""
+    """构造单原子链 SSH 型耦合的 dH/dQ_q。
+
+    约定：这里的 Q_q 不包含超胞归一化因子 1/sqrt(n_cells)，该因子在最终
+    ⟨|d|^2⟩ 中以 1/n_cells 显式出现（与讨论总结口径一致）。
+    """
     dh = np.zeros((n_cells, n_cells), dtype=complex)
-    prefactor = alpha / np.sqrt(n_cells * mass)
+    prefactor = alpha / np.sqrt(mass)
 
     for n in range(n_cells):
         n_next = n + 1
@@ -95,11 +99,15 @@ def dh_dq_ssh_diatomic(
     beta: float = 0.0,
     pbc: bool = True,
 ) -> np.ndarray:
-    """构造 SSH 两带模型的 dH/dQ_{q,nu}（双原子链）。"""
+    """构造 SSH 两带模型的 dH/dQ_{q,nu}（双原子链）。
+
+    约定：这里的 Q_{q,nu} 不包含超胞归一化因子 1/sqrt(n_cells)，该因子在最终
+    ⟨|d|^2⟩ 中以 1/n_cells 显式出现（与讨论总结口径一致）。
+    """
     size = 2 * n_cells
     dh = np.zeros((size, size), dtype=complex)
-    prefactor_a = 1.0 / np.sqrt(n_cells * mass_a)
-    prefactor_b = 1.0 / np.sqrt(n_cells * mass_b)
+    prefactor_a = 1.0 / np.sqrt(mass_a)
+    prefactor_b = 1.0 / np.sqrt(mass_b)
 
     for n in range(n_cells):
         a_idx = 2 * n
