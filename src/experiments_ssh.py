@@ -152,7 +152,9 @@ def case2_scaling(
         localized = np.where(ipr_vals >= ipr_threshold)[0]
         if localized.size < 2:
             raise ValueError("局域态数量不足，无法构造 Case 2")
-        idx1, idx2 = localized[:2]
+        local_ipr = ipr_vals[localized]
+        order = np.argsort(local_ipr)[::-1]
+        idx1, idx2 = localized[order[:2]]
         psi_i = evecs[:, idx1]
         psi_j = evecs[:, idx2]
         delta_e = float(evals[idx2] - evals[idx1])
