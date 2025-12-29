@@ -38,6 +38,23 @@ def diatomic_modes(
     return omegas, eigvecs
 
 
+def diatomic_modes_grid(
+    q_vals: np.ndarray,
+    k_spring: float,
+    mass_a: float,
+    mass_b: float,
+    a: float = 1.0,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """批量计算双原子链的频率与极化矢量。"""
+    omegas = np.zeros((q_vals.shape[0], 2), dtype=float)
+    evecs = np.zeros((q_vals.shape[0], 2, 2), dtype=float)
+    for idx, q in enumerate(q_vals):
+        omega_q, evec_q = diatomic_modes(q, k_spring, mass_a, mass_b, a=a)
+        omegas[idx] = omega_q
+        evecs[idx] = evec_q
+    return omegas, evecs
+
+
 def displacement_from_q(
     q_vals: np.ndarray,
     q_amplitudes: np.ndarray,

@@ -58,6 +58,32 @@ def g_monatomic(
     return np.vdot(psi_i, dh @ psi_j)
 
 
+def g_monatomic_grid(
+    psi_i: np.ndarray,
+    psi_j: np.ndarray,
+    n_cells: int,
+    q_vals: np.ndarray,
+    alpha: float,
+    a: float = 1.0,
+    mass: float = 1.0,
+    pbc: bool = True,
+) -> np.ndarray:
+    """计算单原子链的 g_{ij}(q) 分布。"""
+    g_vals = np.zeros_like(q_vals, dtype=complex)
+    for idx, q in enumerate(q_vals):
+        g_vals[idx] = g_monatomic(
+            psi_i=psi_i,
+            psi_j=psi_j,
+            n_cells=n_cells,
+            q=q,
+            alpha=alpha,
+            a=a,
+            mass=mass,
+            pbc=pbc,
+        )
+    return g_vals
+
+
 def dh_dq_ssh_diatomic(
     n_cells: int,
     q: float,
@@ -133,3 +159,38 @@ def g_ssh_diatomic(
         pbc=pbc,
     )
     return np.vdot(psi_i, dh @ psi_j)
+
+
+def g_ssh_diatomic_grid(
+    psi_i: np.ndarray,
+    psi_j: np.ndarray,
+    n_cells: int,
+    q_vals: np.ndarray,
+    eigenvectors: np.ndarray,
+    alpha: float,
+    a: float = 1.0,
+    mass_a: float = 1.0,
+    mass_b: float = 1.0,
+    beta: float = 0.0,
+    pbc: bool = True,
+) -> np.ndarray:
+    """计算 SSH 双原子链的 g_{ij,nu}(q) 分布。"""
+    if eigenvectors.shape != (q_vals.shape[0], 2, 2):
+        raise ValueError("eigenvectors 形状必须为 (n_q, 2, 2)")
+    g_vals = np.zeros((q_vals.shape[0], 2), dtype=complex)
+    for idx, q in enumerate(q_vals):
+        for mode in range(2):
+            g_vals[idx, mode] = g_ssh_diatomic(
+                psi_i=psi_i,
+                psi_j=psi_j,
+                n_cells=n_cells,
+                q=q,
+                evec=eigenvectors[idx, :, mode],
+                alpha=alpha,
+                a=a,
+                mass_a=mass_a,
+                mass_b=mass_b,
+                beta=beta,
+                pbc=pbc,
+            )
+    return g_vals

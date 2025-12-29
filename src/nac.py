@@ -18,7 +18,10 @@ def qdot_variance(
     if mode == "classical":
         return np.full_like(omegas, BOLTZMANN_EV * temperature, dtype=float)
     if mode == "quantum":
-        n_q = 1.0 / (np.exp(omegas / (BOLTZMANN_EV * temperature)) - 1.0)
+        if temperature <= 0.0:
+            return omegas * 0.5
+        exponent = omegas / (BOLTZMANN_EV * temperature)
+        n_q = 1.0 / (np.exp(exponent) - 1.0)
         return omegas * (n_q + 0.5)
     raise ValueError("mode 必须为 'classical' 或 'quantum'")
 

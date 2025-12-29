@@ -1,0 +1,246 @@
+"""SSH 完整版实验：两带 + 双原子链。"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import List, Tuple
+
+import numpy as np
+
+from .diagnostics import ipr
+from .electron_phonon import g_ssh_diatomic, g_ssh_diatomic_grid
+from .lattice import k_grid, q_grid
+from .nac import mean_square_nac, qdot_variance
+from .phonon_diatomic import diatomic_modes, diatomic_modes_grid
+from .ssh_electron import (
+    band_energies,
+    bloch_eigensystem,
+    bloch_state,
+    build_hamiltonian,
+    build_square_well,
+    diagonalize,
+)
+
+
+@dataclass
+class CaseResult:
+    """单个 Case 的结果容器。"""
+
+    n_vals: np.ndarray
+    d2_vals: np.ndarray
+    delta_e_vals: np.ndarray
+
+
+def select_gap_k(
+    n_cells: int,
+    t0: float,
+    delta_t: float,
+    a: float = 1.0,
+) -> float:
+    """在离散 k 网格上寻找最小带隙对应的 k。"""
+    k_vals = k_grid(n_cells, a=a)
+    gaps = []
+    for k in k_vals:
+        evals_k, _ = bloch_eigensystem(k, t0=t0, delta_t=delta_t, a=a)
+        gaps.append(evals_k[1] - evals_k[0])
+    gaps = np.array(gaps, dtype=float)
+    min_idx = int(np.argmin(gaps))
+    return float(k_vals[min_idx])
+
+
+def case1_scaling(
+    n_vals: List[int],
+    t0: float,
+    delta_t: float,
+    alpha: float,
+    k_spring: float,
+    temperature: float,
+    a: float = 1.0,
+    mass_a: float = 1.0,
+    mass_b: float = 1.0,
+    mode: str = "classical",
+) -> CaseResult:
+    """Case 1：同 k 的 VBM–CBM。"""
+    d2_vals = []
+    delta_e_vals = []
+    for n_cells in n_vals:
+        k_gap = select_gap_k(n_cells, t0=t0, delta_t=delta_t, a=a)
+        evals_k, evecs_k = bloch_eigensystem(k_gap, t0=t0, delta_t=delta_t, a=a)
+        psi_v = bloch_state(n_cells, k_gap, evecs_k[:, 0], a=a)
+        psi_c = bloch_state(n_cells, k_gap, evecs_k[:, 1], a=a)
+        delta_e = float(evals_k[1] - evals_k[0])
+
+        omega_q, evec_q = diatomic_modes(0.0, k_spring, mass_a, mass_b, a=a)
+        mode_idx = int(np.argmax(omega_q))
+        g_val = g_ssh_diatomic(
+            psi_v,
+            psi_c,
+            n_cells,
+            q=0.0,
+            evec=evec_q[:, mode_idx],
+            alpha=alpha,
+            a=a,
+            mass_a=mass_a,
+            mass_b=mass_b,
+        )
+        qdot_var = qdot_variance(np.array([omega_q[mode_idx]]), temperature, mode=mode)
+        d2 = mean_square_nac(np.array([g_val]), delta_e, qdot_var)
+
+        d2_vals.append(d2)
+        delta_e_vals.append(delta_e)
+
+    return CaseResult(
+        n_vals=np.array(n_vals, dtype=int),
+        d2_vals=np.array(d2_vals, dtype=float),
+        delta_e_vals=np.array(delta_e_vals, dtype=float),
+    )
+
+
+def folded_phonon_demo(
+    n_cells: int,
+    t0: float,
+    delta_t: float,
+    alpha: float,
+    k_spring: float,
+    a: float = 1.0,
+    mass_a: float = 1.0,
+    mass_b: float = 1.0,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """折叠声子验证：比较两种位移纹理的一阶耦合。"""
+    k_gap = select_gap_k(n_cells, t0=t0, delta_t=delta_t, a=a)
+    evals_k, evecs_k = bloch_eigensystem(k_gap, t0=t0, delta_t=delta_t, a=a)
+    psi_v = bloch_state(n_cells, k_gap, evecs_k[:, 0], a=a)
+    psi_c = bloch_state(n_cells, k_gap, evecs_k[:, 1], a=a)
+
+    omega_q, evec_q = diatomic_modes(0.0, k_spring, mass_a, mass_b, a=a)
+    mode_idx = int(np.argmax(omega_q))
+    g_opt = g_ssh_diatomic(
+        psi_v,
+        psi_c,
+        n_cells,
+        q=0.0,
+        evec=evec_q[:, mode_idx],
+        alpha=alpha,
+        a=a,
+        mass_a=mass_a,
+        mass_b=mass_b,
+    )
+    return omega_q, np.array([g_opt])
+
+
+def case2_scaling(
+    n_vals: List[int],
+    t0: float,
+    delta_t: float,
+    alpha: float,
+    k_spring: float,
+    temperature: float,
+    well_width: int,
+    well_depth: float,
+    ipr_threshold: float,
+    a: float = 1.0,
+    mass_a: float = 1.0,
+    mass_b: float = 1.0,
+    mode: str = "classical",
+) -> CaseResult:
+    """Case 2：局域-局域。"""
+    d2_vals = []
+    delta_e_vals = []
+    for n_cells in n_vals:
+        onsite = build_square_well(n_cells, center=n_cells // 2, width=well_width, depth=well_depth)
+        h = build_hamiltonian(n_cells, t0=t0, delta_t=delta_t, onsite=onsite, pbc=True)
+        evals, evecs = diagonalize(h)
+
+        ipr_vals = np.array([ipr(evecs[:, i]) for i in range(evecs.shape[1])])
+        localized = np.where(ipr_vals >= ipr_threshold)[0]
+        if localized.size < 2:
+            raise ValueError("局域态数量不足，无法构造 Case 2")
+        idx1, idx2 = localized[:2]
+        psi_i = evecs[:, idx1]
+        psi_j = evecs[:, idx2]
+        delta_e = float(evals[idx2] - evals[idx1])
+
+        q_vals = q_grid(n_cells, a=a)
+        omegas, evecs_q = diatomic_modes_grid(q_vals, k_spring, mass_a, mass_b, a=a)
+        g_vals = g_ssh_diatomic_grid(
+            psi_i,
+            psi_j,
+            n_cells,
+            q_vals,
+            evecs_q,
+            alpha,
+            a=a,
+            mass_a=mass_a,
+            mass_b=mass_b,
+        )
+        qdot_var = qdot_variance(omegas, temperature, mode=mode)
+        d2 = mean_square_nac(g_vals, delta_e, qdot_var)
+
+        d2_vals.append(d2)
+        delta_e_vals.append(delta_e)
+
+    return CaseResult(
+        n_vals=np.array(n_vals, dtype=int),
+        d2_vals=np.array(d2_vals, dtype=float),
+        delta_e_vals=np.array(delta_e_vals, dtype=float),
+    )
+
+
+def case3_scaling(
+    n_vals: List[int],
+    t0: float,
+    delta_t: float,
+    alpha: float,
+    k_spring: float,
+    temperature: float,
+    well_width: int,
+    well_depth: float,
+    ipr_threshold: float,
+    a: float = 1.0,
+    mass_a: float = 1.0,
+    mass_b: float = 1.0,
+    mode: str = "classical",
+) -> CaseResult:
+    """Case 3：局域-延展。"""
+    d2_vals = []
+    delta_e_vals = []
+    for n_cells in n_vals:
+        onsite = build_square_well(n_cells, center=n_cells // 2, width=well_width, depth=well_depth)
+        h = build_hamiltonian(n_cells, t0=t0, delta_t=delta_t, onsite=onsite, pbc=True)
+        evals, evecs = diagonalize(h)
+
+        ipr_vals = np.array([ipr(evecs[:, i]) for i in range(evecs.shape[1])])
+        localized = np.where(ipr_vals >= ipr_threshold)[0]
+        if localized.size == 0:
+            raise ValueError("未找到局域态，无法构造 Case 3")
+        loc_idx = localized[np.argmax(ipr_vals[localized])]
+        ext_idx = int(np.argmin(ipr_vals))
+
+        psi_i = evecs[:, loc_idx]
+        psi_j = evecs[:, ext_idx]
+        delta_e = float(evals[ext_idx] - evals[loc_idx])
+
+        q_vals = q_grid(n_cells, a=a)
+        omegas, evecs_q = diatomic_modes_grid(q_vals, k_spring, mass_a, mass_b, a=a)
+        g_vals = g_ssh_diatomic_grid(
+            psi_i,
+            psi_j,
+            n_cells,
+            q_vals,
+            evecs_q,
+            alpha,
+            a=a,
+            mass_a=mass_a,
+            mass_b=mass_b,
+        )
+        qdot_var = qdot_variance(omegas, temperature, mode=mode)
+        d2 = mean_square_nac(g_vals, delta_e, qdot_var)
+
+        d2_vals.append(d2)
+        delta_e_vals.append(delta_e)
+
+    return CaseResult(
+        n_vals=np.array(n_vals, dtype=int),
+        d2_vals=np.array(d2_vals, dtype=float),
+        delta_e_vals=np.array(delta_e_vals, dtype=float),
+    )

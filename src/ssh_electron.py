@@ -61,6 +61,36 @@ def band_energies(k_vals: np.ndarray, t0: float = 1.0, delta_t: float = 0.2, a: 
     return np.vstack([-energies, energies])
 
 
+def bloch_hamiltonian(k: float, t0: float = 1.0, delta_t: float = 0.2, a: float = 1.0) -> np.ndarray:
+    """SSH 的 2x2 Bloch 哈密顿量。"""
+    v = t0 + delta_t
+    w = t0 - delta_t
+    offdiag = v + w * np.exp(-1j * k * a)
+    h = np.array([[0.0, offdiag], [np.conj(offdiag), 0.0]], dtype=complex)
+    return h
+
+
+def bloch_eigensystem(
+    k: float,
+    t0: float = 1.0,
+    delta_t: float = 0.2,
+    a: float = 1.0,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """返回 2x2 Bloch 哈密顿量的本征值与本征矢。"""
+    h = bloch_hamiltonian(k, t0=t0, delta_t=delta_t, a=a)
+    evals, evecs = np.linalg.eigh(h)
+    return evals, evecs
+
+
+def bloch_state(n_cells: int, k: float, sublattice_vec: np.ndarray, a: float = 1.0) -> np.ndarray:
+    """由 2 分量子格矢构造 real-space Bloch 态。"""
+    phases = np.exp(1j * k * np.arange(n_cells) * a) / np.sqrt(n_cells)
+    psi = np.zeros(2 * n_cells, dtype=complex)
+    psi[0::2] = sublattice_vec[0] * phases
+    psi[1::2] = sublattice_vec[1] * phases
+    return psi
+
+
 def build_square_well(
     n_cells: int,
     center: int,
