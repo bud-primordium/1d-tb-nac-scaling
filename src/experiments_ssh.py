@@ -8,12 +8,11 @@ from typing import List, Tuple
 import numpy as np
 
 from .diagnostics import ipr
-from .electron_phonon import g_ssh_diatomic, g_ssh_diatomic_grid
+from .electron_phonon import g_ssh_diatomic, g_ssh_diatomic_grid, g_ssh_from_displacements
 from .lattice import k_grid, q_grid
 from .nac import mean_square_nac, qdot_variance
-from .phonon_diatomic import diatomic_modes, diatomic_modes_grid
+from .phonon_diatomic import diatomic_modes_grid
 from .ssh_electron import (
-    band_energies,
     bloch_eigensystem,
     bloch_state,
     build_hamiltonian,
@@ -105,27 +104,25 @@ def folded_phonon_demo(
     a: float = 1.0,
     mass_a: float = 1.0,
     mass_b: float = 1.0,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """折叠声子验证：比较两种位移纹理的一阶耦合。"""
     k_gap = select_gap_k(n_cells, t0=t0, delta_t=delta_t, a=a)
     evals_k, evecs_k = bloch_eigensystem(k_gap, t0=t0, delta_t=delta_t, a=a)
     psi_v = bloch_state(n_cells, k_gap, evecs_k[:, 0], a=a)
     psi_c = bloch_state(n_cells, k_gap, evecs_k[:, 1], a=a)
 
-    omega_q, evec_q = diatomic_modes(0.0, k_spring, mass_a, mass_b, a=a)
-    mode_idx = int(np.argmax(omega_q))
-    g_opt = g_ssh_diatomic(
-        psi_v,
-        psi_c,
-        n_cells,
-        q=0.0,
-        evec=evec_q[:, mode_idx],
-        alpha=alpha,
-        a=a,
-        mass_a=mass_a,
-        mass_b=mass_b,
-    )
-    return omega_q, np.array([g_opt])
+    if n_cells != 2:
+        raise ValueError("折叠纹理示例建议使用 n_cells=2 的超胞")
+
+    u_a_mode1 = np.array([1.0, 1.0], dtype=float)
+    u_b_mode1 = np.array([-1.0, -1.0], dtype=float)
+    u_a_mode2 = np.array([1.0, -1.0], dtype=float)
+    u_b_mode2 = np.array([-1.0, 1.0], dtype=float)
+
+    g_mode1 = g_ssh_from_displacements(psi_v, psi_c, u_a_mode1, u_b_mode1, alpha=alpha)
+    g_mode2 = g_ssh_from_displacements(psi_v, psi_c, u_a_mode2, u_b_mode2, alpha=alpha)
+
+    return np.array([g_mode1, g_mode2]), np.array([u_a_mode1, u_a_mode2]), np.array([u_b_mode1, u_b_mode2])
 
 
 def case2_scaling(

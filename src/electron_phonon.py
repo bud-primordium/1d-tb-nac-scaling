@@ -161,6 +161,59 @@ def g_ssh_diatomic(
     return np.vdot(psi_i, dh @ psi_j)
 
 
+def dh_ssh_from_displacements(
+    u_a: np.ndarray,
+    u_b: np.ndarray,
+    alpha: float,
+    beta: float = 0.0,
+    pbc: bool = True,
+) -> np.ndarray:
+    """由实空间位移构造 dH/dλ（假定位移与 λ 线性关系）。"""
+    if u_a.shape != u_b.shape:
+        raise ValueError("u_a 与 u_b 形状必须一致")
+    n_cells = u_a.shape[0]
+    size = 2 * n_cells
+    dh = np.zeros((size, size), dtype=complex)
+
+    for n in range(n_cells):
+        a_idx = 2 * n
+        b_idx = 2 * n + 1
+        n_next = n + 1
+        if n_next >= n_cells:
+            if not pbc:
+                continue
+            n_next = pbc_index(n_next, n_cells)
+        a_next_idx = 2 * n_next
+
+        delta_intra = u_b[n] - u_a[n]
+        delta_inter = u_a[n_next] - u_b[n]
+
+        dh[a_idx, b_idx] += alpha * delta_intra
+        dh[b_idx, a_idx] += alpha * delta_intra
+        dh[b_idx, a_next_idx] += alpha * delta_inter
+        dh[a_next_idx, b_idx] += alpha * delta_inter
+
+        if beta != 0.0:
+            dh[a_idx, a_idx] += beta * u_a[n]
+            dh[b_idx, b_idx] += beta * u_b[n]
+
+    return dh
+
+
+def g_ssh_from_displacements(
+    psi_i: np.ndarray,
+    psi_j: np.ndarray,
+    u_a: np.ndarray,
+    u_b: np.ndarray,
+    alpha: float,
+    beta: float = 0.0,
+    pbc: bool = True,
+) -> complex:
+    """由位移纹理直接计算 SSH 的耦合矩阵元。"""
+    dh = dh_ssh_from_displacements(u_a, u_b, alpha, beta=beta, pbc=pbc)
+    return np.vdot(psi_i, dh @ psi_j)
+
+
 def g_ssh_diatomic_grid(
     psi_i: np.ndarray,
     psi_j: np.ndarray,
