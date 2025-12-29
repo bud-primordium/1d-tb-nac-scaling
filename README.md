@@ -29,7 +29,14 @@
 pytest -q
 ```
 
-3. 运行 notebook：
+3. 运行脚本（推荐）：
+```
+python scripts/run_simple.py
+python scripts/run_ssh.py
+```
+图表统一输出到 `results/figures/`。
+
+4. 运行 notebook：
 在 `notebooks/` 中逐个执行即可，图表统一输出到 `results/figures/`。
 
 ## 约定

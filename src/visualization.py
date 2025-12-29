@@ -6,13 +6,44 @@ from typing import Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
+
+
+def _pick_cjk_fonts() -> list[str]:
+    """从系统字体中挑选可用的中文字体。"""
+    candidates = [
+        "PingFang SC",
+        "Heiti SC",
+        "Heiti TC",
+        "Songti SC",
+        "Songti TC",
+        "STHeiti",
+        "STHeiti Medium",
+        "STHeiti Light",
+        "Hiragino Sans GB",
+        "Noto Sans CJK SC",
+        "Arial Unicode MS",
+        "WenQuanYi Micro Hei",
+        "SimHei",
+        "STSong",
+    ]
+    available = {f.name for f in font_manager.fontManager.ttflist}
+    return [name for name in candidates if name in available]
 
 
 def setup_plot_style() -> None:
     """设置中文字体与统一风格。"""
-    plt.rcParams["font.sans-serif"] = ["SimHei", "STHeiti", "Noto Sans CJK SC"]
-    plt.rcParams["axes.unicode_minus"] = False
     plt.style.use("seaborn-v0_8-whitegrid")
+    fonts = _pick_cjk_fonts()
+    if not fonts:
+        fonts = ["DejaVu Sans"]
+    plt.rcParams["font.family"] = "sans-serif"
+    plt.rcParams["font.sans-serif"] = fonts + ["DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+    plt.rcParams["mathtext.fontset"] = "dejavusans"
+    plt.rcParams["mathtext.default"] = "regular"
+    plt.rcParams["pdf.fonttype"] = 42
+    plt.rcParams["ps.fonttype"] = 42
 
 
 def plot_scaling(
