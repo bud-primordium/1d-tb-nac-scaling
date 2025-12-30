@@ -322,7 +322,7 @@ def generate_figure3_scaling_laws(output_dir: Path):
     ax = axes[0, 1]
     mean_d2 = np.mean(result2.d2_vals)
     std_d2 = np.std(result2.d2_vals)
-    rel_std = std_d2 / mean_d2 * 100  # 相对标准差 (%)
+    rel_std = std_d2 / mean_d2   # 相对标准差 (无%)
     ax.scatter(result2.n_vals, result2.d2_vals, s=40, c=COLORS['case2'], zorder=3, label='Data')
     # 理论线 (常数) 和误差带
     ax.axhline(y=mean_d2, linestyle='-', c=COLORS['theory'], lw=1.5, label=f'Mean')
@@ -360,7 +360,7 @@ def generate_figure3_scaling_laws(output_dir: Path):
     cell_text = [
         ['Case', 'Type', 'Expected', 'Result', 'Quality'],
         ['1', 'Ext-Ext', r'$\beta=1$', f'$\\beta={beta1:.2f}$', f'$R^2={r2_1:.3f}$'],
-        ['2', 'Loc-Loc', 'const', f'$\\sigma/\\mu={rel_std:.2e}$', 'Stable' if rel_std < 5 else 'Varies'],
+        ['2', 'Loc-Loc', 'const', f'$\\sigma/\\mu={rel_std:.2e}$', 'Stable' if rel_std < 0.05 else 'Varies'],
         ['3', 'Loc-Ext', r'$\beta=1$', f'$\\beta={beta3:.2f}$', f'$R^2={r2_3:.3f}$'],
     ]
 
@@ -373,7 +373,7 @@ def generate_figure3_scaling_laws(output_dir: Path):
 
     # 标记通过/失败 - Case 2 用相对标准差判断
     case1_pass = abs(beta1 - 1.0) < 0.15
-    case2_pass = rel_std < 5.0  # 相对标准差 < 5% 视为常数
+    case2_pass = rel_std < 0.05  # 相对标准差 < 5% 视为常数
     case3_pass = abs(beta3 - 1.0) < 0.15
     all_pass = case1_pass and case2_pass and case3_pass
 
