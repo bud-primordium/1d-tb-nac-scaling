@@ -217,7 +217,7 @@ def g_ssh_from_displacements(
     beta: float = 0.0,
     pbc: bool = True,
 ) -> complex:
-    """由位移纹理直接计算 SSH 的耦合矩阵元。"""
+    """由位移模式直接计算 SSH 的耦合矩阵元。"""
     dh = dh_ssh_from_displacements(u_a, u_b, alpha, beta=beta, pbc=pbc)
     return np.vdot(psi_i, dh @ psi_j)
 

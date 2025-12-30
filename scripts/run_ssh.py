@@ -218,7 +218,7 @@ def main() -> None:
     ax.set_xticks([0, 1])
     ax.set_xticklabels(["模式 I", "模式 II"])
     ax.set_ylabel(r"$|g|$")
-    ax.set_title("折叠纹理耦合对比")
+    ax.set_title("折叠模式耦合对比")
     save_figure(fig, "results/figures/F1_folded_ssh")
 
 

@@ -12,6 +12,7 @@ from .electron_phonon import g_ssh_diatomic, g_ssh_diatomic_grid, g_ssh_from_dis
 from .lattice import k_grid, q_grid
 from .nac import mean_square_nac, qdot_variance
 from .phonon_diatomic import diatomic_modes, diatomic_modes_grid
+from .scattering_state import select_scattering_state
 from .ssh_electron import (
     bloch_eigensystem,
     bloch_state,
@@ -28,6 +29,15 @@ class CaseResult:
     n_vals: np.ndarray
     d2_vals: np.ndarray
     delta_e_vals: np.ndarray
+
+
+@dataclass
+class BlochCharacterResult:
+    """Bloch 特征随尺寸的诊断结果。"""
+
+    n_vals: np.ndarray
+    overlaps: np.ndarray
+    indices: np.ndarray
 
 
 def select_gap_k(
@@ -111,7 +121,7 @@ def folded_phonon_demo(
     mass_a: float = 1.0,
     mass_b: float = 1.0,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """折叠声子验证：比较两种位移纹理的一阶耦合。
+    """折叠声子验证：比较两种位移模式的一阶耦合。
 
     演示只有光学型模式（胞内相对运动）有非零耦合，
     而声学型模式（胞内同相运动）耦合为零。
@@ -130,7 +140,7 @@ def folded_phonon_demo(
     psi_c = bloch_state(n_cells, k_ext, evecs_k[:, 1], a=a)
 
     if n_cells != 2:
-        raise ValueError("折叠纹理示例建议使用 n_cells=2 的超胞")
+        raise ValueError("折叠模式示例建议使用 n_cells=2 的超胞")
 
     u_a_mode1 = np.array([1.0, 1.0], dtype=float)
     u_b_mode1 = np.array([-1.0, -1.0], dtype=float)
@@ -266,4 +276,125 @@ def case3_scaling(
         n_vals=np.array(n_vals, dtype=int),
         d2_vals=np.array(d2_vals, dtype=float),
         delta_e_vals=np.array(delta_e_vals, dtype=float),
+    )
+
+
+def case3_scaling_strict(
+    n_vals: List[int],
+    t0: float,
+    delta_t: float,
+    alpha: float,
+    k_spring: float,
+    temperature: float,
+    well_width: int,
+    well_depth: float,
+    ipr_threshold: float,
+    r_ext: float,
+    ext_band: int = 0,
+    energy_window: float | None = None,
+    a: float = 1.0,
+    mass_a: float = 1.0,
+    mass_b: float = 1.0,
+    mode: str = "classical",
+) -> CaseResult:
+    """Case 3（严格版）：局域-延展（延展态取含缺陷散射态的严格本征态）。"""
+    d2_vals = []
+    delta_e_vals = []
+    for n_cells in n_vals:
+        onsite = build_square_well(n_cells, center=n_cells // 2, width=well_width, depth=well_depth)
+        h = build_hamiltonian(n_cells, t0=t0, delta_t=delta_t, onsite=onsite, pbc=True)
+        evals, evecs = diagonalize(h)
+
+        ipr_vals = np.array([ipr(evecs[:, i]) for i in range(evecs.shape[1])])
+        localized = np.where(ipr_vals >= ipr_threshold)[0]
+        if localized.size == 0:
+            raise ValueError("未找到局域态，无法构造 Case 3（严格版）")
+        loc_idx = localized[np.argmax(ipr_vals[localized])]
+        psi_loc = evecs[:, loc_idx]
+
+        k_ext, _ = select_k_from_ratio(n_cells, r_ext, a=a)
+        evals_k, evecs_k = bloch_eigensystem(k_ext, t0=t0, delta_t=delta_t, a=a)
+        band_idx = int(ext_band)
+        if band_idx not in (0, 1):
+            raise ValueError("ext_band 必须为 0（价带）或 1（导带）")
+        psi_ref = bloch_state(n_cells, k_ext, evecs_k[:, band_idx], a=a)
+
+        allowed = np.where(ipr_vals < ipr_threshold)[0]
+        selection = select_scattering_state(
+            evals=evals,
+            evecs=evecs,
+            psi_ref=psi_ref,
+            energy_ref=float(evals_k[band_idx]),
+            energy_window=energy_window,
+            allowed_indices=allowed,
+        )
+        psi_ext = selection.state
+        delta_e = float(evals[selection.idx] - evals[loc_idx])
+
+        q_vals = q_grid(n_cells, a=a)
+        omegas, evecs_q = diatomic_modes_grid(q_vals, k_spring, mass_a, mass_b, a=a)
+        g_vals = g_ssh_diatomic_grid(
+            psi_loc,
+            psi_ext,
+            n_cells,
+            q_vals,
+            evecs_q,
+            alpha,
+            a=a,
+            mass_a=mass_a,
+            mass_b=mass_b,
+        )
+        qdot_var = qdot_variance(omegas, temperature, mode=mode)
+        d2 = mean_square_nac(g_vals, delta_e, qdot_var, n_cells=n_cells)
+
+        d2_vals.append(d2)
+        delta_e_vals.append(delta_e)
+
+    return CaseResult(
+        n_vals=np.array(n_vals, dtype=int),
+        d2_vals=np.array(d2_vals, dtype=float),
+        delta_e_vals=np.array(delta_e_vals, dtype=float),
+    )
+
+
+def bloch_character_vs_N(
+    n_vals: List[int],
+    t0: float,
+    delta_t: float,
+    well_width: int,
+    well_depth: float,
+    ipr_threshold: float,
+    r_ext: float,
+    ext_band: int = 0,
+    a: float = 1.0,
+) -> BlochCharacterResult:
+    """返回含缺陷体系中“最像 Bloch 参考态”的本征态重叠随 N 的变化（SSH）。"""
+    overlaps = []
+    indices = []
+    for n_cells in n_vals:
+        onsite = build_square_well(n_cells, center=n_cells // 2, width=well_width, depth=well_depth)
+        h = build_hamiltonian(n_cells, t0=t0, delta_t=delta_t, onsite=onsite, pbc=True)
+        _, evecs = diagonalize(h)
+
+        ipr_vals = np.array([ipr(evecs[:, i]) for i in range(evecs.shape[1])])
+        allowed = np.where(ipr_vals < ipr_threshold)[0]
+
+        k_ext, _ = select_k_from_ratio(n_cells, r_ext, a=a)
+        evals_k, evecs_k = bloch_eigensystem(k_ext, t0=t0, delta_t=delta_t, a=a)
+        band_idx = int(ext_band)
+        if band_idx not in (0, 1):
+            raise ValueError("ext_band 必须为 0（价带）或 1（导带）")
+        psi_ref = bloch_state(n_cells, k_ext, evecs_k[:, band_idx], a=a)
+
+        coeffs = evecs.conj().T @ psi_ref
+        weights = np.abs(coeffs)
+        weights = np.where(np.isin(np.arange(weights.size), allowed), weights, 0.0)
+        idx = int(np.argmax(weights))
+        overlaps.append(float(weights[idx]))
+        indices.append(idx)
+
+    return BlochCharacterResult(
+        n_vals=np.array(n_vals, dtype=int),
+        overlaps=np.array(overlaps, dtype=float),
+        indices=np.array(indices, dtype=int),
     )
