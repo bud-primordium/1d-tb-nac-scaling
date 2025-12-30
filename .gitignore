@@ -19,3 +19,6 @@ report/*.blg
 
 # Debug outputs
 results/_debug_*.png
+
+# Other system files
+.DS_Store
