@@ -293,7 +293,11 @@ def bloch_character_vs_N(
     r_ext: float,
     a: float = 1.0,
 ) -> BlochCharacterResult:
-    """返回含缺陷体系中“最像 Bloch 参考态”的本征态重叠随 N 的变化。"""
+    """返回含缺陷体系中散射态的 Bloch 特征 W_±k = |⟨ψ|k⟩|² + |⟨ψ|-k⟩|² 随 N 的变化。
+
+    由于时间反演对称性，散射态是 |k⟩ 和 |-k⟩ 的叠加（驻波），
+    因此用 W_±k 作为 Bloch 特征的度量，理论极限为 1。
+    """
     overlaps = []
     indices = []
     for n_cells in n_vals:
@@ -305,12 +309,19 @@ def bloch_character_vs_N(
         allowed = np.where(ipr_vals < ipr_threshold)[0]
 
         k_ext, _ = select_k_from_ratio(n_cells, r_ext, a=a)
-        psi_ref = bloch_state(n_cells, k_ext, a=a)
-        coeffs = evecs.conj().T @ psi_ref
-        weights = np.abs(coeffs)
-        weights = np.where(np.isin(np.arange(weights.size), allowed), weights, 0.0)
-        idx = int(np.argmax(weights))
-        overlaps.append(float(weights[idx]))
+        # 构造 |k⟩ 和 |-k⟩ 参考态
+        psi_k = bloch_state(n_cells, k_ext, a=a)
+        psi_mk = bloch_state(n_cells, -k_ext, a=a)
+
+        # 计算每个本征态的 W_±k = |⟨ψ|k⟩|² + |⟨ψ|-k⟩|²
+        coeffs_k = evecs.conj().T @ psi_k
+        coeffs_mk = evecs.conj().T @ psi_mk
+        w_pm_k = np.abs(coeffs_k) ** 2 + np.abs(coeffs_mk) ** 2
+
+        # 只在延展态中寻找
+        w_pm_k = np.where(np.isin(np.arange(w_pm_k.size), allowed), w_pm_k, 0.0)
+        idx = int(np.argmax(w_pm_k))
+        overlaps.append(float(w_pm_k[idx]))
         indices.append(idx)
 
     return BlochCharacterResult(
