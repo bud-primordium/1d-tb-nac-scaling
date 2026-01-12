@@ -261,7 +261,8 @@ def generate_figure2_wavefunctions(output_dir: Path):
     axes[1, 0].set_title('(d) IPR spectrum', fontsize=10)
 
     axes[1, 1].scatter([evals[loc_idx1], evals[loc_idx2]], [ipr_vals[loc_idx1], ipr_vals[loc_idx2]],
-                       s=50, c=COLORS['case2'], marker='*', zorder=5)
+                       s=50, c=[COLORS['case2'], COLORS['highlight']], marker='*', zorder=5)
+    
     axes[1, 1].set_title('(e) IPR spectrum', fontsize=10)
 
     axes[1, 2].scatter([evals[loc_idx1]], [ipr_vals[loc_idx1]], s=50, c=COLORS['case2'], marker='*', zorder=5)
